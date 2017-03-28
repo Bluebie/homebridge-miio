@@ -54,8 +54,8 @@ function XiaomiMiio(log, config, api) {
       browser.start();
 
       // start polling the Xiaomi devices on network for current status in case other things change them
-      if (this.config.pollChanges !== false)
-        setInterval(()=> this.pollDevices(), (this.config.pollInterval || 15) * 1000);
+      if (!this.config || this.config.pollChanges !== false)
+        setInterval(()=> this.pollDevices(), ((this.config || {}).pollInterval || 15) * 1000);
       this.pollDevices();
     });
   }
@@ -234,7 +234,7 @@ XiaomiMiio.prototype.addAccessory = function(hostname, port) {
   newAccessory.context.miioInfo = miioInfo;
 
   // update serial number and stuff
-  accessory.getService(Service.AccessoryInformation)
+  newAccessory.getService(Service.AccessoryInformation)
     .setCharacteristic(Characteristic.Manufacturer, "Xiaomi")
     .setCharacteristic(Characteristic.Model, "Miio Device")
     .setCharacteristic(Characteristic.SerialNumber, miioInfo.id || `uuid:${uuid}`);

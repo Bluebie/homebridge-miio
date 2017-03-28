@@ -1,7 +1,8 @@
 {
   "name": "homebridge-miio",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Use some Xiaomi devices with Homebridge: https://github.com/Bluebie/homebridge-miio",
+  "homepage": "https://github.com/Bluebie/homebridge-miio",
   "license": "ISC",
   "keywords": [
     "homebridge-plugin"
