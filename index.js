@@ -4,8 +4,6 @@ const miio = require('miio');
 var Accessory, Service, Characteristic, UUIDGen;
 
 module.exports = function(homebridge) {
-  console.log("homebridge API version: " + homebridge.version);
-
   // Accessory must be created from PlatformAccessory Constructor
   Accessory = homebridge.platformAccessory;
 
@@ -44,7 +42,7 @@ function XiaomiMiio(log, config, api) {
         if (!this.accessories[service.host]) {
           this.addAccessory(service.host, service.port);
         } else {
-          if (this.accessories[service.host].miioConfigured == false) this._setupDevice(service.host);
+          //if (this.accessories[service.host].miioConfigured == false) this._setupDevice(service.host);
           this.accessories[service.host].updateReachability(true);
         }
       });
@@ -61,58 +59,19 @@ function XiaomiMiio(log, config, api) {
   }
 }
 
-XiaomiMiio.prototype._setupDevice = function(hostname, done) {
-  // create device api
-  var accessory = this.accessories[hostname];
-  if (!accessory) return this.log("where's the accessory? inside _setupDevice");
-  var device = accessory.miioDevice = miio.createDevice(accessory.context.miioInfo);
-
-  accessory.context.implements = accessory.context.implements || {};
-  var impl = accessory.context.implements;
-
-  // check for capabilities
-  device.getProperties([ 'power', 'mode', 'aqi', 'temp_dec', 'humidity' ]).then((info)=> {
-    // if device reported a power state, we can actuate that
-    if (info.power) impl.power = true;
-    accessory.miioConfigured = true;
-    // todo: recognise other characteristics and expose them as homekit characteristics too...
-  }).catch((err)=> {
-    accessory.updateReachability(false);
-    accessory.miioConfigured = false;
-    this.log("Miio device unreachable during setup: " + hostname, err);
-  });
-
-  if (impl.power) {
-    (accessory.getService(Service.Switch, "Power") || accessory.addService(Service.Switch, "Power"))
-    .getCharacteristic(Characteristic.On)
-    .on('set', (value, callback)=> {
-      this.log(hostname, "power to " + value);
-      device.setPower(!!value).then(()=> callback()).catch(()=> callback("Communications Error"));
-    }).on('get', (callback)=> {
-      device.getProperties(['power'])
-      .then((value)=> callback(null, {"on": 1, "off": 0}[value.power]))
-      .catch(()=> callback("Communications Error"));
-    });
-  }
-
-  // accessory.on('identify', (paired, callback)=> {
-  //   this.log(accessory.displayName, "Identify!!!");
-  //   callback();
-  // });
-
-  if (done) done();
-}
-
 XiaomiMiio.prototype.pollDevices = function() {
   for (let host in this.accessories) {
     let accessory = this.accessories[host];
     let queries = [];
-    if (accessory.getService(Service.Switch, "Power")) queries.push("power");
+    if (accessory.context.features.switch) queries.push("power");
     if (queries.length > 0) {
       accessory.miioDevice.getProperties(queries).then((props)=> {
-        if (accessory.miioConfigured === false) this._setupDevice(host);
+        //this.log(accessory.displayName, "state update:", props);
         accessory.updateReachability(true);
-        if (props.power) accessory.getService(Service.Switch, "Power").updateCharacteristic(Characteristic.On, props.power == "on");
+        if (props.power !== undefined) {
+          accessory.getService(Service.Switch, "Power")
+                   .updateCharacteristic(Characteristic.On, props.power);
+        }
       }).catch(()=> {
         accessory.updateReachability(false);
       })
@@ -125,122 +84,65 @@ XiaomiMiio.prototype.pollDevices = function() {
 // Update current value
 XiaomiMiio.prototype.configureAccessory = function(accessory) {
   this.log(accessory.displayName, "Configure Accessory");
-  var platform = this;
 
-  accessory.reachable = false; // this gets updated automatically when mdns discovers it
-
-  this.accessories[accessory.context.miioInfo.address] = accessory;
-  this._setupDevice(accessory.context.miioInfo.address);
-}
-
-// Handler will be invoked when user try to config your plugin
-// Callback can be cached and invoke when nessary
-XiaomiMiio.prototype.configurationRequestHandler = function(context, request, callback) {
-  this.log("Context: ", JSON.stringify(context));
-  this.log("Request: ", JSON.stringify(request));
-
-  // Check the request response
-  if (request && request.response && request.response.inputs && request.response.inputs.name) {
-    this.addAccessory(request.response.inputs.name);
-
-    // Invoke callback with config will let homebridge save the new config into config.json
-    // Callback = function(response, type, replace, config)
-    // set "type" to platform if the plugin is trying to modify platforms section
-    // set "replace" to true will let homebridge replace existing config in config.json
-    // "config" is the data platform trying to save
-    callback(null, "platform", true, {"platform":"XiaomiMiio", "otherConfig":"SomeData"});
+  // remove legacy entries
+  if (!accessory.context.features) {
+    this.api.unregisterPlatformAccessories("homebridge-miio", "XiaomiMiio", [accessory]);
     return;
   }
 
-  // - UI Type: Input
-  // Can be used to request input from user
-  // User response can be retrieved from request.response.inputs next time
-  // when configurationRequestHandler being invoked
+  this.accessories[accessory.context.miioInfo.address] = accessory;
 
-  var respDict = {
-    "type": "Interface",
-    "interface": "input",
-    "title": "Add Accessory",
-    "items": [
-      {
-        "id": "name",
-        "title": "Name",
-        "placeholder": "Fancy Light"
-      }//,
-      // {
-      //   "id": "pw",
-      //   "title": "Password",
-      //   "secure": true
-      // }
-    ]
+  // create device api
+  if (!accessory.miioDevice) accessory.miioDevice = miio.createDevice(accessory.context.miioInfo);
+  var device = accessory.miioDevice;
+
+  accessory.miioDevice.stopMonitoring(); // turn off monitoring feature of miio lib
+
+  if (accessory.context.features.switch) {
+    (accessory.getService(Service.Switch, "Power") || accessory.addService(Service.Switch, "Power"))
+    .getCharacteristic(Characteristic.On)
+    .on('set', (value, callback)=> {
+      this.log(accessory.displayName, "power to " + value);
+      device.setPower(!!value).then(()=> callback()).catch(()=> callback("Communications Error"));
+    }).on('get', (callback)=> {
+      this.log(accessory.displayName, "fetch status")
+      device.getProperties(['power'])
+      .then((value)=> callback(null, value.power))
+      .catch(()=> callback("Communications Error"));
+    });
   }
-
-  // - UI Type: List
-  // Can be used to ask user to select something from the list
-  // User response can be retrieved from request.response.selections next time
-  // when configurationRequestHandler being invoked
-
-  // var respDict = {
-  //   "type": "Interface",
-  //   "interface": "list",
-  //   "title": "Select Something",
-  //   "allowMultipleSelection": true,
-  //   "items": [
-  //     "A","B","C"
-  //   ]
-  // }
-
-  // - UI Type: Instruction
-  // Can be used to ask user to do something (other than text input)
-  // Hero image is base64 encoded image data. Not really sure the maximum length HomeKit allows.
-
-  // var respDict = {
-  //   "type": "Interface",
-  //   "interface": "instruction",
-  //   "title": "Almost There",
-  //   "detail": "Please press the button on the bridge to finish the setup.",
-  //   "heroImage": "base64 image data",
-  //   "showActivityIndicator": true,
-  // "showNextButton": true,
-  // "buttonText": "Login in browser",
-  // "actionURL": "https://google.com"
-  // }
-
-  // Plugin can set context to allow it track setup process
-  context.ts = "Hello";
-
-  //invoke callback to update setup UI
-  callback(respDict);
 }
 
 // Sample function to show how developer can add accessory dynamically from outside event
 XiaomiMiio.prototype.addAccessory = function(hostname, port) {
-  this.log("Investigating Miio device at udp://" + hostname + ":" + port)
+  this.log("Investigating Miio Device at udp://" + hostname + ":" + port)
   // figure out what sort of accessory it is
   var miioInfo = miio.infoFromHostname(hostname);
   miioInfo.address = hostname;
   miioInfo.port = port;
-  var accessoryName = miioInfo.id || "Miio Device";
+  var uuid = UUIDGen.generate(hostname);
+  var accessory = false;
 
-  this.log("Miio Accessory detected: " + accessoryName);
-  var platform = this;
-  var uuid;
-
-  uuid = UUIDGen.generate(hostname);
-
-  var newAccessory = new Accessory(accessoryName, uuid);
+  if (miioInfo.model.match(/chuangmi-plug/)) {
+    this.log("Miio Accessory is a switch plug. Adding to HomeKit");
+    accessory = new Accessory(miioInfo.id || "Miio Switch", uuid);
+    accessory.context.features = {"switch": true};
+  } else {
+    this.log("Unsupported, ignoring");
+    return;
+  }
 
   // store contact info for device in to accessory's perminant data
-  newAccessory.context.miioInfo = miioInfo;
+  accessory.context.miioInfo = miioInfo;
 
   // update serial number and stuff
-  newAccessory.getService(Service.AccessoryInformation)
+  accessory.getService(Service.AccessoryInformation)
     .setCharacteristic(Characteristic.Manufacturer, "Xiaomi")
-    .setCharacteristic(Characteristic.Model, "Miio Device")
+    .setCharacteristic(Characteristic.Model, miioInfo.model || "Miio Device")
     .setCharacteristic(Characteristic.SerialNumber, miioInfo.id || `uuid:${uuid}`);
 
-  this.accessories[hostname] = newAccessory;
-  this._setupDevice(hostname, ()=> {
-    this.api.registerPlatformAccessories("homebridge-miio", "XiaomiMiio", [newAccessory]);
-  });
+  this.accessories[hostname] = accessory;
+  this.api.registerPlatformAccessories("homebridge-miio", "XiaomiMiio", [accessory]);
+  this.configureAccessory(accessory);
 }
