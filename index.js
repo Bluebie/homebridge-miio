@@ -1,6 +1,7 @@
 // for discovering miio devices that advertise over MDNS
 const mdns = require('mdns');
 const miio = require('miio');
+const HKMiioVersion = require('./package.json').version;
 var Accessory, Service, Characteristic, UUIDGen;
 
 module.exports = function(homebridge) {
@@ -86,7 +87,7 @@ XiaomiMiio.prototype.configureAccessory = function(accessory) {
   this.log(accessory.displayName, "Configure Accessory");
 
   // remove legacy entries
-  if (!accessory.context.features) {
+  if (accessory.context.version !== HKMiioVersion) {
     this.api.unregisterPlatformAccessories("homebridge-miio", "XiaomiMiio", [accessory]);
     return;
   }
@@ -135,6 +136,7 @@ XiaomiMiio.prototype.addAccessory = function(hostname, port) {
 
   // store contact info for device in to accessory's perminant data
   accessory.context.miioInfo = miioInfo;
+  accessory.context.version = HKMiioVersion;
 
   // update serial number and stuff
   accessory.getService(Service.AccessoryInformation)
