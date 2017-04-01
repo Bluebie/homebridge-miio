@@ -64,13 +64,13 @@ XiaomiMiio.prototype.pollDevices = function() {
   for (let host in this.accessories) {
     let accessory = this.accessories[host];
     let queries = [];
-    if (accessory.context.features.switch) queries.push("power");
+    if (accessory.context.features.switchPlug) queries.push("power");
     if (queries.length > 0) {
       accessory.miioDevice.getProperties(queries).then((props)=> {
         //this.log(accessory.displayName, "state update:", props);
         accessory.updateReachability(true);
         if (props.power !== undefined) {
-          accessory.getService(Service.Switch, "Power")
+          accessory.getService(Service.Outlet, "Power Plug")
                    .updateCharacteristic(Characteristic.On, props.power);
         }
       }).catch(()=> {
@@ -87,7 +87,7 @@ XiaomiMiio.prototype.configureAccessory = function(accessory) {
   this.log(accessory.displayName, "Configure Accessory");
 
   // remove legacy entries
-  if (accessory.context.version !== HKMiioVersion) {
+  if (accessory.context.miioVersion !== HKMiioVersion) {
     this.api.unregisterPlatformAccessories("homebridge-miio", "XiaomiMiio", [accessory]);
     return;
   }
@@ -100,9 +100,9 @@ XiaomiMiio.prototype.configureAccessory = function(accessory) {
 
   accessory.miioDevice.stopMonitoring(); // turn off monitoring feature of miio lib
 
-  if (accessory.context.features.switch) {
-    (accessory.getService(Service.Switch, "Power") || accessory.addService(Service.Switch, "Power"))
-    .getCharacteristic(Characteristic.On)
+  if (accessory.context.features.switchPlug) {
+    var service = accessory.getService(Service.Outlet, "Power Plug") || accessory.addService(Service.Outlet, "Power Plug");
+    service.getCharacteristic(Characteristic.On)
     .on('set', (value, callback)=> {
       this.log(accessory.displayName, "power to " + value);
       device.setPower(!!value).then(()=> callback()).catch(()=> callback("Communications Error"));
@@ -112,6 +112,8 @@ XiaomiMiio.prototype.configureAccessory = function(accessory) {
       .then((value)=> callback(null, value.power))
       .catch(()=> callback("Communications Error"));
     });
+    // we can't possibly know this, so we assume as best we can:
+    service.updateCharacteristic(Characteristic.OutletInUse, true);
   }
 }
 
@@ -127,8 +129,8 @@ XiaomiMiio.prototype.addAccessory = function(hostname, port) {
 
   if (miioInfo.model.match(/chuangmi-plug/)) {
     this.log("Miio Accessory is a switch plug. Adding to HomeKit");
-    accessory = new Accessory(miioInfo.id || "Miio Switch", uuid);
-    accessory.context.features = {"switch": true};
+    accessory = new Accessory(miioInfo.id || "Miio Switchable Plug", uuid);
+    accessory.context.features = {switchPlug: true};
   } else {
     this.log("Unsupported, ignoring");
     return;
@@ -136,7 +138,7 @@ XiaomiMiio.prototype.addAccessory = function(hostname, port) {
 
   // store contact info for device in to accessory's perminant data
   accessory.context.miioInfo = miioInfo;
-  accessory.context.version = HKMiioVersion;
+  accessory.context.miioVersion = HKMiioVersion;
 
   // update serial number and stuff
   accessory.getService(Service.AccessoryInformation)
