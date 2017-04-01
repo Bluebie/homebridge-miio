@@ -1,0 +1,19 @@
+{
+  "bridge": {
+    "name": "TestBridge",
+    "username": "CC:22:3D:E3:CE:33",
+    "port": 51826,
+    "pin": "031-45-154"
+  },
+
+  "description": "Test Bridge",
+  "accessories": [],
+  "platforms": [
+    {
+      "platform" : "XiaomiMiio",
+      "name" : "XiaomiMiio",
+      "pollChanges": true,
+      "pollInterval": 15
+    }
+  ]
+}
