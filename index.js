@@ -37,18 +37,23 @@ function XiaomiMiio(log, config, api) {
     this.api.on('didFinishLaunching', ()=> {
       platform.log("DidFinishLaunching");
 
+      // remove any out of date accessories so they don't cause conflicts
+      let outdatedAccessories = Object.keys(this.accessories)
+        .map(k => this.accessories[k]).filter(a => a.context.miioVersion !== HKMiioVersion);
+      this.api.unregisterPlatformAccessories("homebridge-miio", "XiaomiMiio", outdatedAccessories);
+      outdatedAccessories.forEach(a => this.accessories[a.context.miioInfo.address] = null);
+
       // watch all miio devices announcing over mdns
       var browser = mdns.createBrowser(mdns.udp('miio'));
       browser.on('serviceUp', (service)=> {
-        if (!this.accessories[service.host]) {
-          this.addAccessory(service.host, service.port);
-        } else {
-          //if (this.accessories[service.host].miioConfigured == false) this._setupDevice(service.host);
+        platform.log("device discovered", service.host)
+        this.addAccessory(service.host, service.port);
+        if (this.accessories[service.host])
           this.accessories[service.host].updateReachability(true);
-        }
       });
       browser.on('serviceDown', (service)=> {
-        if (this.accessories[service.host]) this.accessories[service.host].updateReachability(false);
+        if (this.accessories[service.host])
+          this.accessories[service.host].updateReachability(false);
       });
       browser.start();
 
@@ -85,20 +90,20 @@ XiaomiMiio.prototype.pollDevices = function() {
 // Update current value
 XiaomiMiio.prototype.configureAccessory = function(accessory) {
   this.log(accessory.displayName, "Configure Accessory");
-
-  // remove legacy entries
-  if (accessory.context.miioVersion !== HKMiioVersion) {
-    this.api.unregisterPlatformAccessories("homebridge-miio", "XiaomiMiio", [accessory]);
-    return;
-  }
-
   this.accessories[accessory.context.miioInfo.address] = accessory;
+
+  // update serial number and stuff
+  accessory.getService(Service.AccessoryInformation)
+    .setCharacteristic(Characteristic.Manufacturer, "Xiaomi")
+    .setCharacteristic(Characteristic.Model, `v${HKMiioVersion}: ${accessory.context.miioInfo.model || "Unknown Device"}`)
+    .setCharacteristic(Characteristic.SerialNumber, accessory.context.miioInfo.id || "Unknown");
 
   // create device api
   if (!accessory.miioDevice) accessory.miioDevice = miio.createDevice(accessory.context.miioInfo);
   var device = accessory.miioDevice;
 
-  accessory.miioDevice.stopMonitoring(); // turn off monitoring feature of miio lib
+  // turn off monitoring feature of miio lib
+  accessory.miioDevice.stopMonitoring();
 
   if (accessory.context.features.switchPlug) {
     var service = accessory.getService(Service.Outlet, "Power Plug") || accessory.addService(Service.Outlet, "Power Plug");
@@ -117,7 +122,7 @@ XiaomiMiio.prototype.configureAccessory = function(accessory) {
   }
 }
 
-// Sample function to show how developer can add accessory dynamically from outside event
+// check a newly detected accessory and make sure it's in the bridge
 XiaomiMiio.prototype.addAccessory = function(hostname, port) {
   this.log("Investigating Miio Device at udp://" + hostname + ":" + port)
   // figure out what sort of accessory it is
@@ -125,28 +130,28 @@ XiaomiMiio.prototype.addAccessory = function(hostname, port) {
   miioInfo.address = hostname;
   miioInfo.port = port;
   var uuid = UUIDGen.generate(hostname);
-  var accessory = false;
+  var isNew = !this.accessories[hostname]; // does it need registering?
 
   if (miioInfo.model.match(/chuangmi-plug/)) {
-    this.log("Miio Accessory is a switch plug. Adding to HomeKit");
-    accessory = new Accessory(miioInfo.id || "Miio Switchable Plug", uuid);
-    accessory.context.features = {switchPlug: true};
+    if (isNew) {
+      this.log("Miio Accessory is a switch plug. Adding to HomeKit");
+      this.accessories[hostname] = new Accessory(`Miio Plug ${miioInfo.id}`, uuid);
+    }
+    this.accessories[hostname].context.features = {switchPlug: true};
   } else {
     this.log("Unsupported, ignoring");
-    return;
   }
 
-  // store contact info for device in to accessory's perminant data
-  accessory.context.miioInfo = miioInfo;
-  accessory.context.miioVersion = HKMiioVersion;
-
-  // update serial number and stuff
-  accessory.getService(Service.AccessoryInformation)
-    .setCharacteristic(Characteristic.Manufacturer, "Xiaomi")
-    .setCharacteristic(Characteristic.Model, miioInfo.model || "Miio Device")
-    .setCharacteristic(Characteristic.SerialNumber, miioInfo.id || `uuid:${uuid}`);
-
-  this.accessories[hostname] = accessory;
-  this.api.registerPlatformAccessories("homebridge-miio", "XiaomiMiio", [accessory]);
-  this.configureAccessory(accessory);
+  if (this.accessories[hostname]) {
+    let accessory = this.accessories[hostname];
+    // store contact info for device in to accessory's permanent data
+    accessory.context.miioInfo = miioInfo;
+    accessory.context.miioVersion = HKMiioVersion;
+    accessory.updateReachability(true);
+    // register it if necessary
+    if (isNew) {
+      this.api.registerPlatformAccessories("homebridge-miio", "XiaomiMiio", [accessory]);
+      this.configureAccessory(accessory);
+    }
+  }
 }
