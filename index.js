@@ -1,5 +1,5 @@
 // for discovering miio devices that advertise over MDNS
-const mdns = require('mdns');
+const mdns = require('tinkerhub-mdns');
 const miio = require('miio');
 const HKMiioVersion = require('./package.json').version;
 var Accessory, Service, Characteristic, UUIDGen;
@@ -44,14 +44,14 @@ function XiaomiMiio(log, config, api) {
       outdatedAccessories.forEach(a => this.accessories[a.context.miioInfo.address] = null);
 
       // watch all miio devices announcing over mdns
-      var browser = mdns.createBrowser(mdns.udp('miio'));
-      browser.on('serviceUp', (service)=> {
+      var browser = mdns.browser({ type: 'miio', protocol: 'udp' });
+      browser.on('available', (service)=> {
         platform.log("device discovered", service.host)
         this.addAccessory(service.host, service.port);
         if (this.accessories[service.host])
           this.accessories[service.host].updateReachability(true);
       });
-      browser.on('serviceDown', (service)=> {
+      browser.on('unavailable', (service)=> {
         if (this.accessories[service.host])
           this.accessories[service.host].updateReachability(false);
       });
