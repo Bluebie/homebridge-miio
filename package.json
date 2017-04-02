@@ -15,7 +15,7 @@
     "url": "http://github.com/Bluebie/homebridge-miio/issues"
   },
   "dependencies":{
-    "mdns": ">=0.0.1",
+    "tinkerhub-mdns": ">=0.1.0",
     "miio": ">=0.4.0"
   },
   "engines": {
