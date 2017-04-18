@@ -53,6 +53,11 @@ function XiaomiMiio(log, config, api) {
         if (this.accessories[info.id])
           this.accessories[info.id].updateReachability(false);
       });
+      this.miioBrowser.on('update', (info)=> {
+        this.addAccessory(info);
+        if (this.accessories[info.id])
+          this.accessories[info.id].updateReachability(true);
+      });
 
       // start polling the Xiaomi devices on network for current status in case other things change them
       // if (!this.config || this.config.pollChanges !== false)
@@ -66,6 +71,7 @@ function XiaomiMiio(log, config, api) {
 XiaomiMiio.prototype.pollDevices = function(looping) {
   var accessories = Object.keys(this.accessories).map((id) => this.accessories[id]);
   var interval = ((this.config.pollInterval || 15) * 1000) / accessories.length;
+
   var loop = (list)=> {
     let accessory = list.shift();
     if (accessory && accessory.context) this.pollDevice(accessory);
@@ -83,13 +89,15 @@ XiaomiMiio.prototype.pollDevices = function(looping) {
 XiaomiMiio.prototype.pollDevice = function(accessory, cb) {
   let queries = [];
   if (accessory.miioDevice.type == 'switch') queries = ["power"];
-  accessory.miioDevice.getProperties(queries)
+  accessory.miioDevice.loadProperties(queries)
   .then((props)=> {
     accessory.updateReachability(true);
     if (accessory.miioDevice.type == 'switch') {
-      accessory.context.powerOn = !!props.power;
+      accessory.context.powerOn = !!props.powerChannel0;
       accessory.getService(Service.Outlet, "Power Plug")
-               .updateCharacteristic(Characteristic.On, !!props.power);
+               .updateCharacteristic(Characteristic.On, !!props.powerChannel0);
+    } else {
+      this.log("Unsupported accessory is somehow in homebridge database");
     }
     if (cb) cb();
   }).catch((err)=> {

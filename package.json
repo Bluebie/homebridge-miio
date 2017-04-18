@@ -1,6 +1,6 @@
 {
   "name": "homebridge-miio",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Use some Xiaomi devices with Homebridge: https://github.com/Bluebie/homebridge-miio",
   "homepage": "https://github.com/Bluebie/homebridge-miio",
   "license": "ISC",
@@ -15,7 +15,7 @@
     "url": "http://github.com/Bluebie/homebridge-miio/issues"
   },
   "dependencies":{
-    "miio": "=0.6.0"
+    "miio": "=0.7.0"
   },
   "engines": {
     "homebridge": ">=0.4.16",
