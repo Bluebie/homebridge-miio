@@ -155,7 +155,7 @@ XiaomiMiio.prototype.configureAccessory = function(accessory) {
     // we can't possibly know this, so we assume as best we can:
     service.updateCharacteristic(Characteristic.OutletInUse, true);
   } else {
-    this.log("Mysteriously there is a device in here which isn't a switch...", device.type);
+    this.log("Mysteriously there is a device in here which isn't a switch...", accessory.context.miioType);
   }
 }
 
