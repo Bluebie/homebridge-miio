@@ -14,8 +14,8 @@
   "bugs": {
     "url": "http://github.com/Bluebie/homebridge-miio/issues"
   },
-  "dependencies":{
-    "miio": "=0.7.0"
+  "dependencies": {
+    "miio": "^0.12.0"
   },
   "engines": {
     "homebridge": ">=0.4.16",

@@ -42,7 +42,7 @@ function XiaomiMiio(log, config, api) {
       outdatedAccessories.forEach(a => this.accessories[a.context.miioInfo.address] = null);
 
       // discover miio devices and then poll for new ones occasionally
-      this.miioBrowser = miio.browser({cacheTime: this.config.searchInterval || 1800});
+      this.miioBrowser = miio.browse({cacheTime: this.config.searchInterval || 1800});
       this.miioBrowser.on('available', (info)=> {
         platform.log("device discovered", info.id)
         this.addAccessory(info);
