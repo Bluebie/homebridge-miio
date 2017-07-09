@@ -1,6 +1,12 @@
 const miio = require('miio');
 const HKMiioVersion = require('./package.json').version;
 var Accessory, Service, Characteristic, UUIDGen;
+const SupportedTypes = {
+  "outlet":true,
+  "power-plug":true,
+  "power-strip":true,
+  "power-switch":true
+};
 
 module.exports = function(homebridge) {
   // Accessory must be created from PlatformAccessory Constructor
@@ -88,11 +94,11 @@ XiaomiMiio.prototype.pollDevices = function(looping) {
 // query a specific accessory for updated state
 XiaomiMiio.prototype.pollDevice = function(accessory, cb) {
   let queries = [];
-  if (accessory.miioDevice.type == 'switch') queries = ["power"];
+  if (SupportedTypes[accessory.miioDevice.type]) queries = ["power"];
   accessory.miioDevice.loadProperties(queries)
   .then((props)=> {
     accessory.updateReachability(true);
-    if (accessory.miioDevice.type == 'switch') {
+    if (SupportedTypes[accessory.miioDevice.type]) {
       accessory.context.powerOn = !!props.powerChannel0;
       accessory.getService(Service.Outlet, "Power Plug")
                .updateCharacteristic(Characteristic.On, !!props.powerChannel0);
@@ -170,7 +176,7 @@ XiaomiMiio.prototype.addAccessory = function(miioInfo) {
     var uuid = UUIDGen.generate(`miio.${device.model}.${miioInfo.id}`);
     var isNew = !this.accessories[miioInfo.id]; // does it need registering?
 
-    if (device.type == 'switch') {
+    if (SupportedTypes[device.type]) {
       if (isNew) {
         this.log("Miio Accessory is a switch plug. Adding to HomeKit");
         this.accessories[miioInfo.id] = new Accessory(`miIO Plug ${miioInfo.id}`, uuid);

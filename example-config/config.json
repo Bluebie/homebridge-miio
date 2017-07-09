@@ -1,9 +1,9 @@
 {
   "bridge": {
     "name": "TestBridge",
-    "username": "CC:22:3D:E3:CE:33",
+    "username": "CC:22:3D:E2:CE:33",
     "port": 51826,
-    "pin": "031-45-154"
+    "pin": "012-21-883"
   },
 
   "description": "Test Bridge",
