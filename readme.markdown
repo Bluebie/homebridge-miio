@@ -35,7 +35,7 @@ ones operating over Zigbee, though this is likely to change in the future._
       "name" : "XiaomiMiio",
       "pollChanges": true,
       "pollInterval": 15,
-      "searchInterval": 1800,
+      "searchInterval": 1800
     }
   ]
 }
