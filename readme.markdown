@@ -1,6 +1,12 @@
 **homebridge-miio** is a platform plugin for homebridge which lets you switch
 Xiaomi Power Plugs on and off using Homekit apps and Siri.
 
+**Note: this plugin works for me, but i'm not motivated to maintain it's
+compatibility with other devices or firmware versions that i'm not using.
+If you have problems, please send some pull requests! Opening an issue isn't
+enough. I'm not "upgrading" my devices to incompatible firmware versions just
+to debug issues for you.**
+
 It seems very reliable now, and should coexist happily with other Xiaomi home
 automation ecosystem plugins. Eventually it would be nice to support some other
 device types, if people who have those devices want to do pull requests, or
